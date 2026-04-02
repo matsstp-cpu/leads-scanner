@@ -2,82 +2,107 @@
 <html lang="ru">
 <head>
     <meta charset="UTF-8">
-    <title>LEAD_SCANNER // PRO</title>
+    <title>LEAD_SCANNER // PLATFORM</title>
     <style>
-        :root { --bg: #0a0a0a; --text: #e0e0e0; --accent: #ff3366; --border: #333; }
-        body { background: var(--bg); color: var(--text); font-family: monospace; padding: 30px; display: flex; flex-direction: column; align-items: center; }
-        .panel { display: flex; gap: 10px; margin: 20px 0; width: 100%; max-width: 900px; }
-        input { flex: 1; background: transparent; border: 1px solid var(--border); color: #fff; padding: 12px; }
-        button { background: var(--accent); color: #fff; border: none; padding: 12px 20px; cursor: pointer; font-weight: bold; }
-        .export-btn { background: #444; display: none; }
-        table { width: 100%; max-width: 1200px; border-collapse: collapse; display: none; margin-top: 20px; }
-        th, td { border: 1px solid var(--border); padding: 10px; text-align: left; font-size: 13px; }
-        th { color: var(--accent); background: #111; }
-        a { color: #00ffcc; text-decoration: none; }
-        a:hover { text-decoration: underline; }
-        #loader { display: none; color: var(--accent); }
+        :root { --bg: #050505; --text: #ffffff; --accent: #ff3366; --gray: #1a1a1a; --border: #333; }
+        body { background: var(--bg); color: var(--text); font-family: 'Courier New', monospace; margin: 0; padding: 40px; }
+        .container { max-width: 1100px; margin: 0 auto; }
+        h1 { font-size: 24px; text-transform: uppercase; border-left: 5px solid var(--accent); padding-left: 15px; margin-bottom: 30px; }
+        
+        .search-box { display: flex; gap: 10px; background: var(--gray); padding: 20px; border: 1px solid var(--border); margin-bottom: 20px; }
+        input { flex: 1; background: #000; border: 1px solid var(--border); color: #00ffcc; padding: 15px; font-family: monospace; outline: none; }
+        button { background: var(--accent); color: white; border: none; padding: 0 30px; cursor: pointer; font-weight: bold; text-transform: uppercase; }
+        button:hover { filter: brightness(1.2); }
+        .export-btn { background: #333; display: none; }
+
+        table { width: 100%; border-collapse: collapse; margin-top: 20px; display: none; background: #000; }
+        th { background: var(--gray); color: var(--accent); text-align: left; padding: 15px; border: 1px solid var(--border); font-size: 12px; }
+        td { padding: 12px; border: 1px solid var(--border); font-size: 13px; }
+        tr:hover { background: #0a0a0a; }
+        
+        a.company-link { color: #00ffcc; text-decoration: none; border-bottom: 1px solid transparent; }
+        a.company-link:hover { border-bottom: 1px solid #00ffcc; }
+        
+        .tag { font-size: 10px; padding: 2px 6px; background: #222; border-radius: 3px; color: #aaa; }
+        #loader { display: none; color: var(--accent); font-weight: bold; margin-bottom: 10px; }
     </style>
 </head>
 <body>
-    <h1>Lead_Scanner</h1>
-    <div class="panel">
-        <input type="text" id="q" placeholder="ОКВЭД или сфера деятельности">
-        <button onclick="search()">Найти</button>
-        <button id="ex" class="export-btn" onclick="download()">Скачать CSV</button>
+    <div class="container">
+        <h1>Lead_Scanner // Data_Extraction</h1>
+        
+        <div class="search-box">
+            <input type="text" id="q" placeholder="ОКВЭД, ИНН ИЛИ ОТРАСЛЬ...">
+            <button onclick="search()">SCAN</button>
+            <button id="ex" class="export-btn" onclick="download()">SAVE CSV</button>
+        </div>
+
+        <div id="loader">_ИНИЦИАЛИЗАЦИЯ ПОИСКА...</div>
+
+        <table id="tbl">
+            <thead>
+                <tr>
+                    <th>ИНН</th>
+                    <th>ОРГАНИЗАЦИЯ (COMPANIUM)</th>
+                    <th>ЛОКАЦИЯ</th>
+                    <th>ОКВЭД</th>
+                    <th>СТАТУС</th>
+                </tr>
+            </thead>
+            <tbody id="body"></tbody>
+        </table>
     </div>
-    <div id="loader">Ищу компании и ОКВЭДы...</div>
-    <table id="tbl">
-        <thead>
-            <tr>
-                <th>ИНН</th>
-                <th>Компания (ссылка на контакты)</th>
-                <th>Город</th>
-                <th>ОКВЭД</th>
-                <th>Рейтинг</th>
-            </tr>
-        </thead>
-        <tbody id="body"></tbody>
-    </table>
 
     <script>
         let leads = [];
+
         async function search() {
             const query = document.getElementById('q').value;
             if(!query) return;
+            
             document.getElementById('loader').style.display = 'block';
+            document.getElementById('tbl').style.display = 'none';
+
             try {
                 const r = await fetch('/api', {
                     method: 'POST',
                     body: JSON.stringify({ query })
                 });
                 const d = await r.json();
-                leads = d.leads;
+                leads = d.leads || [];
+
                 let h = '';
                 leads.forEach(l => {
-                    // Создаем ссылку на Rusprofile по ИНН для быстрого поиска контактов
-                    const searchLink = `https://www.rusprofile.ru/search?query=${l.inn}`;
+                    // Ссылка на Companium по ИНН
+                    const compLink = `https://компаниум.рф/search?q=${l.inn}`;
                     h += `<tr>
-                        <td>${l.inn}</td>
-                        <td><a href="${searchLink}" target="_blank"><strong>${l.name}</strong></a></td>
+                        <td><span class="tag">${l.inn}</span></td>
+                        <td><a href="${compLink}" target="_blank" class="company-link"><strong>${l.name}</strong></a></td>
                         <td>${l.city}</td>
                         <td>${l.okved}</td>
-                        <td>${l.score}/10</td>
+                        <td style="color: ${l.score > 5 ? '#00ffcc' : '#ff3366'}">${l.status}</td>
                     </tr>`;
                 });
+
                 document.getElementById('body').innerHTML = h;
                 document.getElementById('tbl').style.display = 'table';
                 document.getElementById('ex').style.display = 'inline-block';
-            } catch (e) { alert('Ошибка'); }
-            document.getElementById('loader').style.display = 'none';
+            } catch (e) { 
+                alert('ERROR: CONNECTION FAILED'); 
+            } finally {
+                document.getElementById('loader').style.display = 'none';
+            }
         }
 
         function download() {
-            let csv = '\uFEFFИНН,Компания,Город,ОКВЭД,Рейтинг\n';
-            leads.forEach(l => { csv += `${l.inn},"${l.name}","${l.city}","${l.okved}",${l.score}\n`; });
+            let csv = '\uFEFFИНН,Компания,Город,ОКВЭД,Статус\n';
+            leads.forEach(l => {
+                csv += `${l.inn},"${l.name}","${l.city}","${l.okved}",${l.status}\n`;
+            });
             const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
             const a = document.createElement("a");
             a.href = URL.createObjectURL(blob);
-            a.download = "leads_list.csv";
+            a.download = `leads_export_${new Date().toLocaleDateString()}.csv`;
             a.click();
         }
     </script>
