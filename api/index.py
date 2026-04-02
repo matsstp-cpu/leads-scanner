@@ -44,12 +44,15 @@ class handler(BaseHTTPRequestHandler):
                 d = item.get('data', {})
                 city = d.get('address', {}).get('data', {}).get('city') or d.get('address', {}).get('value', 'Не указан')
                 
+                # Достаем основной ОКВЭД и его описание
+                okved_code = d.get('okved', '---')
+                
                 formatted_leads.append({
                     "inn": d.get('inn', '-'),
                     "name": item.get('value', 'Без названия'),
                     "city": city,
-                    "description": d.get('okved', 'ОКВЭД не указан'),
-                    "site": d.get('ogrn', '-'),
+                    "okved": okved_code,
+                    "ogrn": d.get('ogrn', '-'),
                     "score": 9 if d.get('state', {}).get('status') == 'ACTIVE' else 4
                 })
 
