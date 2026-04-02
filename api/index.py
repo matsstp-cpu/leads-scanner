@@ -4,20 +4,6 @@ import json
 import urllib.request
 
 class handler(BaseHTTPRequestHandler):
-    def do_GET(self):
-        template_path = os.path.join(os.path.dirname(__file__), 'index.html')
-        try:
-            with open(template_path, 'r', encoding='utf-8') as f:
-                content = f.read()
-            self.send_response(200)
-            self.send_header('Content-type', 'text/html; charset=utf-8')
-            self.end_headers()
-            self.wfile.write(content.encode('utf-8'))
-        except Exception as e:
-            self.send_response(500)
-            self.end_headers()
-            self.wfile.write(f"Error: {str(e)}".encode('utf-8'))
-
     def do_POST(self):
         content_length = int(self.headers['Content-Length'])
         post_data = self.rfile.read(content_length)
@@ -25,46 +11,50 @@ class handler(BaseHTTPRequestHandler):
         try:
             data = json.loads(post_data.decode('utf-8'))
             query = data.get('query', '')
+            offset = data.get('offset', 0)
             api_key = os.environ.get("DADATA_API_KEY")
             
+            # Используем метод 'findById' или 'suggest' с фильтрами для реестра
             url = "https://suggestions.dadata.ru/suggestions/api/4_1/rs/suggest/party"
             headers = {
                 "Content-Type": "application/json",
                 "Accept": "application/json",
                 "Authorization": f"Token {api_key}"
             }
-            # Лимит 20 компаний для стабильности
-            body = json.dumps({"query": query, "count": 20}).encode('utf-8')
+            
+            # ФИЛЬТР: Мы просим только активные компании (ACTIVE)
+            # и ограничиваем поиск конкретным типом данных
+            body = json.dumps({
+                "query": query,
+                "count": 20,
+                "offset": offset,
+                "status": ["ACTIVE"],
+                "from_bound": {"value": "party"},
+                "to_bound": {"value": "party"}
+            }).encode('utf-8')
             
             req = urllib.request.Request(url, data=body, headers=headers)
             with urllib.request.urlopen(req) as response:
-                dadata_res = json.loads(response.read().decode('utf-8'))
+                res = json.loads(response.read().decode('utf-8'))
 
-            formatted_leads = []
-            for item in dadata_res.get('suggestions', []):
+            leads = []
+            for item in res.get('suggestions', []):
                 d = item.get('data', {})
-                
-                # Собираем данные
-                city = d.get('address', {}).get('data', {}).get('city') or d.get('address', {}).get('value', 'Регион РФ')
-                okved = d.get('okved', 'Не указан')
-                status = d.get('state', {}).get('status')
-                
-                formatted_leads.append({
-                    "inn": d.get('inn', '-'),
-                    "name": item.get('value', 'Без названия'),
-                    "city": city,
-                    "okved": okved,
-                    "status": "Действующая" if status == 'ACTIVE' else "Ликвидирована",
-                    "score": 10 if status == 'ACTIVE' else 2
+                # Берем только важные для бизнеса поля
+                leads.append({
+                    "inn": d.get('inn'),
+                    "name": item.get('value'),
+                    "city": d.get('address', {}).get('data', {}).get('city') or "РФ",
+                    "okved": d.get('okved', 'Не указан'),
+                    "ogrn": d.get('ogrn', '-')
                 })
 
             self.send_response(200)
             self.send_header('Content-type', 'application/json')
             self.end_headers()
-            self.wfile.write(json.dumps({"leads": formatted_leads}).encode('utf-8'))
+            self.wfile.write(json.dumps({"leads": leads}).encode('utf-8'))
             
         except Exception as e:
             self.send_response(500)
-            self.send_header('Content-type', 'application/json')
             self.end_headers()
             self.wfile.write(json.dumps({"error": str(e)}).encode('utf-8'))
