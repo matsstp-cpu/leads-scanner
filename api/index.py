@@ -33,7 +33,6 @@ class handler(BaseHTTPRequestHandler):
                 "Accept": "application/json",
                 "Authorization": f"Token {api_key}"
             }
-            # Увеличиваем count до 20 (лимит бесплатного тарифа)
             body = json.dumps({"query": query, "count": 20}).encode('utf-8')
             
             req = urllib.request.Request(url, data=body, headers=headers)
@@ -43,16 +42,14 @@ class handler(BaseHTTPRequestHandler):
             formatted_leads = []
             for item in dadata_res.get('suggestions', []):
                 d = item.get('data', {})
-                # Извлекаем город и сайт
                 city = d.get('address', {}).get('data', {}).get('city') or d.get('address', {}).get('value', 'Не указан')
-                website = d.get('phones', ['Нет данных'])[0] # DaData редко дает email бесплатно, берем что есть
                 
                 formatted_leads.append({
                     "inn": d.get('inn', '-'),
                     "name": item.get('value', 'Без названия'),
                     "city": city,
                     "description": d.get('okved', 'ОКВЭД не указан'),
-                    "site": d.get('ogrn', '-'), # Вместо сайта пока ОГРН для надежности
+                    "site": d.get('ogrn', '-'),
                     "score": 9 if d.get('state', {}).get('status') == 'ACTIVE' else 4
                 })
 
@@ -63,5 +60,6 @@ class handler(BaseHTTPRequestHandler):
             
         except Exception as e:
             self.send_response(500)
+            self.send_header('Content-type', 'application/json')
             self.end_headers()
             self.wfile.write(json.dumps({"error": str(e)}).encode('utf-8'))
