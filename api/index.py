@@ -27,33 +27,35 @@ class handler(BaseHTTPRequestHandler):
             query = data.get('query', '')
             api_key = os.environ.get("DADATA_API_KEY")
             
-            # Запрос к DaData
             url = "https://suggestions.dadata.ru/suggestions/api/4_1/rs/suggest/party"
             headers = {
                 "Content-Type": "application/json",
                 "Accept": "application/json",
                 "Authorization": f"Token {api_key}"
             }
-            body = json.dumps({"query": query, "count": 10}).encode('utf-8')
+            # Увеличиваем count до 20 (лимит бесплатного тарифа)
+            body = json.dumps({"query": query, "count": 20}).encode('utf-8')
             
             req = urllib.request.Request(url, data=body, headers=headers)
             with urllib.request.urlopen(req) as response:
                 dadata_res = json.loads(response.read().decode('utf-8'))
 
-            # ПЕРЕВОДЧИК: превращаем формат DaData в формат твоего интерфейса
             formatted_leads = []
             for item in dadata_res.get('suggestions', []):
-                data_info = item.get('data', {})
+                d = item.get('data', {})
+                # Извлекаем город и сайт
+                city = d.get('address', {}).get('data', {}).get('city') or d.get('address', {}).get('value', 'Не указан')
+                website = d.get('phones', ['Нет данных'])[0] # DaData редко дает email бесплатно, берем что есть
+                
                 formatted_leads.append({
-                    "inn": data_info.get('inn', '-'),
+                    "inn": d.get('inn', '-'),
                     "name": item.get('value', 'Без названия'),
-                    "description": data_info.get('okved', 'ОКВЭД не указан'),
-                    "phone": "Контакт скрыт",
-                    "email": "Скрыто",
-                    "score": 8 # Заглушка рейтинга
+                    "city": city,
+                    "description": d.get('okved', 'ОКВЭД не указан'),
+                    "site": d.get('ogrn', '-'), # Вместо сайта пока ОГРН для надежности
+                    "score": 9 if d.get('state', {}).get('status') == 'ACTIVE' else 4
                 })
 
-            # Отправляем JSON, который ждет твой HTML
             self.send_response(200)
             self.send_header('Content-type', 'application/json')
             self.end_headers()
@@ -61,6 +63,5 @@ class handler(BaseHTTPRequestHandler):
             
         except Exception as e:
             self.send_response(500)
-            self.send_header('Content-type', 'application/json')
             self.end_headers()
             self.wfile.write(json.dumps({"error": str(e)}).encode('utf-8'))
