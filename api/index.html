@@ -13,10 +13,9 @@
         input:focus { border-color: var(--accent); }
         button { background: var(--accent); color: #fff; border: none; padding: 15px 25px; font-weight: bold; cursor: pointer; text-transform: uppercase; transition: 0.2s; white-space: nowrap; }
         button:hover { background: #fff; color: #000; }
-        .export-btn { background: #444; color: #aaa; display: none; } /* Скрыта по умолчанию */
+        .export-btn { background: #444; color: #aaa; display: none; }
         .export-btn:hover { background: #fff; color: #000; }
-        
-        table { width: 100%; max-width: 1200px; border-collapse: collapse; margin-top: 20px; display: none; } /* Скрыта по умолчанию */
+        table { width: 100%; max-width: 1200px; border-collapse: collapse; margin-top: 20px; display: none; }
         th, td { border: 1px solid var(--border); padding: 12px; text-align: left; font-size: 14px; }
         th { background: var(--panel-bg); color: var(--accent); }
         .score-high { color: #00ffcc; font-weight: bold; }
@@ -31,30 +30,72 @@
         <button onclick="generateLeads()">Найти</button>
         <button id="exportBtn" class="export-btn" onclick="downloadCSV()">Скачать CSV</button>
     </div>
-    
     <div id="loader">Сканирую базы данных DaData...</div>
-    
     <table id="resultsTable">
         <thead>
             <tr>
                 <th>ИНН</th>
                 <th>Компания</th>
                 <th>Город</th>
-                <th>Сайт / ОГРН</th>
-                <th>Рейтинг (0-10)</th>
+                <th>ОГРН</th>
+                <th>Рейтинг</th>
             </tr>
         </thead>
         <tbody id="tableBody"></tbody>
     </table>
 
     <script>
-        // Хранилище для данных, которые будем скачивать
         let currentLeads = [];
 
         async function generateLeads() {
             const query = document.getElementById('queryInput').value;
             if (!query) return;
             
-            // Показываем лоадер, скрываем таблицу и кнопку экспорта
             document.getElementById('loader').style.display = 'block';
-            document.getElementById('resultsTable').style.display = 'none
+            document.getElementById('resultsTable').style.display = 'none';
+            document.getElementById('exportBtn').style.display = 'none';
+
+            try {
+                const response = await fetch('/api', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ query })
+                });
+                const data = await response.json();
+                currentLeads = data.leads || [];
+
+                let html = '';
+                currentLeads.forEach(lead => {
+                    html += `<tr>
+                        <td>${lead.inn}</td>
+                        <td><strong>${lead.name}</strong></td>
+                        <td>${lead.city}</td>
+                        <td>${lead.site}</td>
+                        <td class="${lead.score >= 7 ? 'score-high' : 'score-low'}">${lead.score}/10</td>
+                    </tr>`;
+                });
+
+                document.getElementById('tableBody').innerHTML = html;
+                document.getElementById('resultsTable').style.display = 'table';
+                document.getElementById('exportBtn').style.display = 'inline-block';
+            } catch (e) {
+                alert('Ошибка связи с сервером');
+            } finally {
+                document.getElementById('loader').style.display = 'none';
+            }
+        }
+
+        function downloadCSV() {
+            let csv = '\uFEFFИНН,Компания,Город,ОГРН,Рейтинг\n';
+            currentLeads.forEach(l => {
+                csv += `${l.inn},"${l.name}","${l.city}",${l.site},${l.score}\n`;
+            });
+            const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+            const link = document.createElement("a");
+            link.href = URL.createObjectURL(blob);
+            link.download = "leads_export.csv";
+            link.click();
+        }
+    </script>
+</body>
+</html>
