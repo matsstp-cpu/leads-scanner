@@ -1,24 +1,23 @@
 from http.server import BaseHTTPRequestHandler
 import os
+import json
+import urllib.request
 
 class handler(BaseHTTPRequestHandler):
     def do_GET(self):
-        # 1. Определяем путь к файлу (он должен лежать в папке api вместе с этим скриптом)
+        # 1. Определяем путь к файлу (он лежит в папке api вместе с этим скриптом)
         template_path = os.path.join(os.path.dirname(__file__), 'index.html')
         
         try:
-            # 2. Читаем дизайн
             with open(template_path, 'r', encoding='utf-8') as f:
                 content = f.read()
             
-            # 3. Отправляем ответ браузеру
             self.send_response(200)
             self.send_header('Content-type', 'text/html; charset=utf-8')
             self.end_headers()
             self.wfile.write(content.encode('utf-8'))
             
         except Exception as e:
-            # Если файл не нашелся или не открылся
             self.send_response(500)
             self.send_header('Content-type', 'text/html; charset=utf-8')
             self.end_headers()
@@ -30,9 +29,6 @@ class handler(BaseHTTPRequestHandler):
         post_data = self.rfile.read(content_length)
         
         try:
-            import json
-            import urllib.request
-            
             # Получаем запрос от пользователя
             data = json.loads(post_data.decode('utf-8'))
             query = data.get('query', '')
@@ -53,7 +49,7 @@ class handler(BaseHTTPRequestHandler):
             with urllib.request.urlopen(req) as response:
                 result = response.read().decode('utf-8')
             
-            # Отправляем результат обратно на черную страницу
+            # Отправляем результат (ТОЛЬКО ОДИН РАЗ)
             self.send_response(200)
             self.send_header('Content-type', 'application/json')
             self.end_headers()
@@ -61,8 +57,6 @@ class handler(BaseHTTPRequestHandler):
             
         except Exception as e:
             self.send_response(500)
+            self.send_header('Content-type', 'application/json')
             self.end_headers()
             self.wfile.write(json.dumps({"error": str(e)}).encode('utf-8'))
-        self.send_response(200)
-        self.end_headers()
-        self.wfile.write("Поиск пока не настроен".encode('utf-8'))
