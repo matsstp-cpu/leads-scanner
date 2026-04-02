@@ -23,6 +23,11 @@ def analyze_lead_free(company_name, description):
     return min(score, 10) # Максимум 10 баллов
 
 class handler(BaseHTTPRequestHandler):
+    def do_GET(self):
+        self.send_response(200)
+        self.send_header('Content-type', 'text/plain')
+        self.end_headers()
+        self.wfile.write("API is running. Use the frontend to search.".encode('utf-8'))
     def do_POST(self):
         content_length = int(self.headers['Content-Length'])
         post_data = self.rfile.read(content_length)
