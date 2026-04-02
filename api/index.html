@@ -2,110 +2,128 @@
 <html lang="ru">
 <head>
     <meta charset="UTF-8">
-    <title>LEAD_SCANNER // PLATFORM</title>
+    <title>LEAD_SCANNER // ENTERPRISE_REED</title>
     <style>
-        :root { --bg: #050505; --text: #ffffff; --accent: #ff3366; --gray: #151515; --border: #2a2a2a; }
-        body { background: var(--bg); color: var(--text); font-family: 'Courier New', monospace; margin: 0; padding: 40px; }
-        .container { max-width: 1200px; margin: 0 auto; }
-        h1 { font-size: 20px; text-transform: uppercase; letter-spacing: 3px; border-left: 4px solid var(--accent); padding-left: 15px; margin-bottom: 30px; }
-        
-        .search-box { display: flex; gap: 0; background: var(--gray); padding: 10px; border: 1px solid var(--border); margin-bottom: 30px; }
-        input { flex: 1; background: transparent; border: 1px solid #333; color: #00ffcc; padding: 15px; font-size: 16px; outline: none; }
-        button { background: var(--accent); color: white; border: none; padding: 0 35px; cursor: pointer; font-weight: bold; text-transform: uppercase; transition: 0.3s; }
-        button:hover { background: #fff; color: #000; }
-        .export-btn { background: #333; margin-left: 10px; display: none; }
-
-        table { width: 100%; border-collapse: collapse; display: none; margin-top: 10px; border: 1px solid var(--border); }
-        th { background: #111; color: var(--accent); text-align: left; padding: 15px; font-size: 11px; border-bottom: 2px solid var(--border); }
-        td { padding: 15px; border-bottom: 1px solid var(--border); font-size: 13px; }
-        tr:hover { background: #0a0a0a; }
-        
-        a.company-link { color: #00ffcc; text-decoration: none; font-weight: bold; }
-        a.company-link:hover { color: #fff; text-decoration: underline; }
-        
-        .status-active { color: #00ffcc; }
-        .status-closed { color: #ff3366; }
-        #loader { display: none; color: var(--accent); margin-bottom: 15px; font-size: 12px; }
+        :root { --bg: #050505; --accent: #ff3366; --border: #222; }
+        body { background: var(--bg); color: #fff; font-family: 'Courier New', monospace; padding: 20px; }
+        .header { border-bottom: 2px solid var(--accent); margin-bottom: 20px; padding-bottom: 10px; }
+        .controls { position: sticky; top: 0; background: #000; padding: 20px; border: 1px solid var(--border); z-index: 100; display: flex; gap: 10px; align-items: center; }
+        input { flex: 1; background: transparent; border: 1px solid #444; color: #00ffcc; padding: 12px; outline: none; }
+        button { background: var(--accent); color: white; border: none; padding: 12px 25px; cursor: pointer; font-weight: bold; text-transform: uppercase; }
+        #stopBtn { background: #444; display: none; }
+        .stats { margin: 10px 0; font-size: 14px; color: #aaa; background: #111; padding: 10px; border-left: 3px solid #00ffcc; }
+        table { width: 100%; border-collapse: collapse; margin-top: 10px; }
+        th, td { border: 1px solid var(--border); padding: 10px; text-align: left; font-size: 13px; }
+        th { background: #151515; color: var(--accent); position: sticky; top: 100px; }
+        a { color: #00ffcc; text-decoration: none; font-weight: bold; }
+        #loader { display: none; color: var(--accent); margin-left: 10px; animation: blink 1s infinite; }
+        @keyframes blink { 50% { opacity: 0; } }
     </style>
 </head>
 <body>
-    <div class="container">
-        <h1>LEAD_SCANNER // VERSION_2.0</h1>
-        
-        <div class="search-box">
-            <input type="text" id="q" placeholder="ВВЕДИТЕ ОКВЭД, ОТРАСЛЬ ИЛИ ИНН...">
-            <button onclick="search()">SCAN</button>
-            <button id="ex" class="export-btn" onclick="download()">SAVE CSV</button>
-        </div>
-
-        <div id="loader">>> ЗАПРОС К БАЗЕ ДАННЫХ...</div>
-
-        <table id="tbl">
-            <thead>
-                <tr>
-                    <th>ИНН</th>
-                    <th>КОМПАНИЯ (COMPANIUM.RU)</th>
-                    <th>ГОРОД</th>
-                    <th>ОКВЭД</th>
-                    <th>СТАТУС</th>
-                </tr>
-            </thead>
-            <tbody id="body"></tbody>
-        </table>
+    <div class="header">
+        <h1>LEAD_SCANNER_v4.0 // OFFICIAL_REED_MODE</h1>
+    </div>
+    
+    <div class="controls">
+        <input type="text" id="q" placeholder="ОКВЭД ИЛИ ОТРАСЛЬ (НАПР: 62.01 МОСКВА)">
+        <button id="startBtn" onclick="startBulkSearch()">НАЧАТЬ СБОР 1000+</button>
+        <button id="stopBtn" onclick="stopSearch()">СТОП</button>
+        <button onclick="downloadCSV()" style="background:#0066ff">EXCEL / CSV</button>
+        <div id="loader">_SCANNING...</div>
     </div>
 
-    <script>
-        let leads = [];
+    <div class="stats">РЕЕСТР ЗАГРУЖЕН: <span id="count" style="color:#00ffcc; font-weight:bold;">0</span> / 1000 КОМПАНИЙ</div>
 
-        async function search() {
+    <table id="tbl">
+        <thead>
+            <tr>
+                <th>ИНН</th>
+                <th>ОРГАНИЗАЦИЯ (COMPANIUM)</th>
+                <th>ГОРОД</th>
+                <th>ОКВЭД</th>
+                <th>ОГРН</th>
+            </tr>
+        </thead>
+        <tbody id="body"></tbody>
+    </table>
+
+    <script>
+        let allLeads = new Map();
+        let isRunning = false;
+
+        async function startBulkSearch() {
             const query = document.getElementById('q').value;
             if(!query) return;
+
+            isRunning = true;
+            document.getElementById('startBtn').style.display = 'none';
+            document.getElementById('stopBtn').style.display = 'inline-block';
+            document.getElementById('loader').style.display = 'inline-block';
+
+            let offset = 0;
             
-            document.getElementById('loader').style.display = 'block';
-            document.getElementById('tbl').style.display = 'none';
-
-            try {
-                const r = await fetch('/api', {
-                    method: 'POST',
-                    body: JSON.stringify({ query })
-                });
-                const d = await r.json();
-                leads = d.leads || [];
-
-                let h = '';
-                leads.forEach(l => {
-                    // Формируем прямую ссылку на Компаниум по ИНН
-                    const compUrl = `https://companium.ru/id/${l.inn}`;
-                    const statusClass = l.score > 5 ? 'status-active' : 'status-closed';
+            while(isRunning && allLeads.size < 1000) {
+                try {
+                    const response = await fetch('/api', {
+                        method: 'POST',
+                        body: JSON.stringify({ query, offset })
+                    });
+                    const data = await response.json();
                     
-                    h += `<tr>
-                        <td style="color: #666;">${l.inn}</td>
-                        <td><a href="${compUrl}" target="_blank" class="company-link">${l.name}</a></td>
-                        <td>${l.city}</td>
-                        <td style="font-size: 11px;">${l.okved}</td>
-                        <td class="${statusClass}">${l.status}</td>
-                    </tr>`;
-                });
+                    if(!data.leads || data.leads.length === 0) {
+                        alert("Реестр закончился или достигнут лимит выдачи.");
+                        break;
+                    }
 
-                document.getElementById('body').innerHTML = h;
-                document.getElementById('tbl').style.display = 'table';
-                document.getElementById('ex').style.display = 'inline-block';
-            } catch (e) { 
-                alert('SYSTEM ERROR: ПОПРОБУЙТЕ ПОЗЖЕ'); 
-            } finally {
-                document.getElementById('loader').style.display = 'none';
+                    data.leads.forEach(l => {
+                        if(!allLeads.has(l.inn)) {
+                            allLeads.set(l.inn, l);
+                            addTableRow(l);
+                        }
+                    });
+
+                    document.getElementById('count').innerText = allLeads.size;
+                    offset += 20; 
+                    
+                    // Пауза для стабильности
+                    await new Promise(r => setTimeout(r, 400)); 
+
+                } catch (e) {
+                    console.error("Ошибка шага:", e);
+                    break;
+                }
             }
+            stopSearch();
         }
 
-        function download() {
-            let csv = '\uFEFFИНН,Компания,Город,ОКВЭД,Статус\n';
-            leads.forEach(l => {
-                csv += `${l.inn},"${l.name}","${l.city}","${l.okved}",${l.status}\n`;
+        function addTableRow(l) {
+            const row = `<tr>
+                <td style="color:#666">${l.inn}</td>
+                <td><a href="https://companium.ru/id/${l.inn}" target="_blank">${l.name}</a></td>
+                <td>${l.city}</td>
+                <td>${l.okved}</td>
+                <td style="color:#444">${l.ogrn}</td>
+            </tr>`;
+            document.getElementById('body').insertAdjacentHTML('beforeend', row);
+        }
+
+        function stopSearch() {
+            isRunning = false;
+            document.getElementById('startBtn').style.display = 'inline-block';
+            document.getElementById('stopBtn').style.display = 'none';
+            document.getElementById('loader').style.display = 'none';
+        }
+
+        function downloadCSV() {
+            let csv = '\uFEFFИНН,Компания,Город,ОКВЭД,ОГРН\n';
+            allLeads.forEach(l => {
+                csv += `${l.inn},"${l.name}","${l.city}","${l.okved}","${l.ogrn}"\n`;
             });
             const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
             const a = document.createElement("a");
             a.href = URL.createObjectURL(blob);
-            a.download = `leads_extract_${l.inn}.csv`;
+            a.download = `REED_EXPORT_${new Date().getTime()}.csv`;
             a.click();
         }
     </script>
