@@ -33,7 +33,7 @@ class handler(BaseHTTPRequestHandler):
                 "Accept": "application/json",
                 "Authorization": f"Token {api_key}"
             }
-            # Берем 20 компаний за раз
+            # Лимит 20 компаний для стабильности
             body = json.dumps({"query": query, "count": 20}).encode('utf-8')
             
             req = urllib.request.Request(url, data=body, headers=headers)
@@ -44,9 +44,9 @@ class handler(BaseHTTPRequestHandler):
             for item in dadata_res.get('suggestions', []):
                 d = item.get('data', {})
                 
-                # Чистим данные для таблицы
-                city = d.get('address', {}).get('data', {}).get('city') or d.get('address', {}).get('value', 'Не указан')
-                okved = d.get('okved', '---')
+                # Собираем данные
+                city = d.get('address', {}).get('data', {}).get('city') or d.get('address', {}).get('value', 'Регион РФ')
+                okved = d.get('okved', 'Не указан')
                 status = d.get('state', {}).get('status')
                 
                 formatted_leads.append({
