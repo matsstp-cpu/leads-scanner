@@ -1,57 +1,60 @@
-.export-btn { background: #555; margin-left: 10px; display: none; }
-
-<div class="control-panel">
-    <input type="text" id="queryInput" placeholder="ОКВЭД или название отрасли">
-    <button onclick="generateLeads()">Найти</button>
-    <button id="exportBtn" class="export-btn" onclick="downloadCSV()">Скачать CSV</button>
-</div>
-
-<th>Город</th>
-
-<script>
-    let currentLeads = []; // Хранилище для экспорта
-
-    async function generateLeads() {
-        const query = document.getElementById('queryInput').value;
-        if (!query) return;
-        document.getElementById('loader').style.display = 'block';
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>LEAD_SCANNER // PLATFORM</title>
+    <style>
+        :root { --bg: #0a0a0a; --text: #e0e0e0; --accent: #ff3366; --border: #333; --panel-bg: #1a1a1a; }
+        body { background-color: var(--bg); color: var(--text); font-family: 'Courier New', monospace; margin: 0; padding: 40px; display: flex; flex-direction: column; align-items: center; }
+        h1 { text-transform: uppercase; letter-spacing: 2px; border-bottom: 2px solid var(--accent); padding-bottom: 10px; }
+        .control-panel { display: flex; gap: 10px; margin: 30px 0; width: 100%; max-width: 900px; background: var(--panel-bg); padding: 20px; border: 1px solid var(--border); }
+        input { flex: 1; background: transparent; border: 1px solid var(--border); color: var(--text); padding: 15px; font-size: 16px; outline: none; }
+        input:focus { border-color: var(--accent); }
+        button { background: var(--accent); color: #fff; border: none; padding: 15px 25px; font-weight: bold; cursor: pointer; text-transform: uppercase; transition: 0.2s; white-space: nowrap; }
+        button:hover { background: #fff; color: #000; }
+        .export-btn { background: #444; color: #aaa; display: none; } /* Скрыта по умолчанию */
+        .export-btn:hover { background: #fff; color: #000; }
         
-        try {
-            const response = await fetch('/api', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ query })
-            });
-            const data = await response.json();
-            currentLeads = data.leads;
-            
-            let html = '';
-            currentLeads.forEach(lead => {
-                html += `<tr>
-                    <td>${lead.inn}</td>
-                    <td>${lead.name}</td>
-                    <td>${lead.city}</td>
-                    <td>${lead.description}</td>
-                    <td>${lead.site}</td>
-                    <td class="${lead.score >= 7 ? 'score-high' : 'score-low'}">${lead.score}</td>
-                </tr>`;
-            });
-            document.getElementById('tableBody').innerHTML = html;
-            document.getElementById('resultsTable').style.display = 'table';
-            document.getElementById('exportBtn').style.display = 'inline-block';
-        } catch (e) { alert('Ошибка'); }
-        finally { document.getElementById('loader').style.display = 'none'; }
-    }
+        table { width: 100%; max-width: 1200px; border-collapse: collapse; margin-top: 20px; display: none; } /* Скрыта по умолчанию */
+        th, td { border: 1px solid var(--border); padding: 12px; text-align: left; font-size: 14px; }
+        th { background: var(--panel-bg); color: var(--accent); }
+        .score-high { color: #00ffcc; font-weight: bold; }
+        .score-low { color: #ff3333; }
+        #loader { display: none; color: var(--accent); margin-top: 20px; font-weight: bold; }
+    </style>
+</head>
+<body>
+    <h1>Lead_Scanner</h1>
+    <div class="control-panel">
+        <input type="text" id="queryInput" placeholder="Введите ОКВЭД (62.01) или город">
+        <button onclick="generateLeads()">Найти</button>
+        <button id="exportBtn" class="export-btn" onclick="downloadCSV()">Скачать CSV</button>
+    </div>
+    
+    <div id="loader">Сканирую базы данных DaData...</div>
+    
+    <table id="resultsTable">
+        <thead>
+            <tr>
+                <th>ИНН</th>
+                <th>Компания</th>
+                <th>Город</th>
+                <th>Сайт / ОГРН</th>
+                <th>Рейтинг (0-10)</th>
+            </tr>
+        </thead>
+        <tbody id="tableBody"></tbody>
+    </table>
 
-    function downloadCSV() {
-        let csv = 'ИНН,Компания,Город,ОКВЭД\n';
-        currentLeads.forEach(l => {
-            csv += `${l.inn},"${l.name}","${l.city}",${l.description}\n`;
-        });
-        const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
-        const link = document.createElement("a");
-        link.href = URL.createObjectURL(blob);
-        link.download = "leads_export.csv";
-        link.click();
-    }
-</script>
+    <script>
+        // Хранилище для данных, которые будем скачивать
+        let currentLeads = [];
+
+        async function generateLeads() {
+            const query = document.getElementById('queryInput').value;
+            if (!query) return;
+            
+            // Показываем лоадер, скрываем таблицу и кнопку экспорта
+            document.getElementById('loader').style.display = 'block';
+            document.getElementById('resultsTable').style.display = 'none
