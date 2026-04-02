@@ -33,6 +33,7 @@ class handler(BaseHTTPRequestHandler):
                 "Accept": "application/json",
                 "Authorization": f"Token {api_key}"
             }
+            # Берем 20 компаний за раз
             body = json.dumps({"query": query, "count": 20}).encode('utf-8')
             
             req = urllib.request.Request(url, data=body, headers=headers)
@@ -42,18 +43,19 @@ class handler(BaseHTTPRequestHandler):
             formatted_leads = []
             for item in dadata_res.get('suggestions', []):
                 d = item.get('data', {})
-                city = d.get('address', {}).get('data', {}).get('city') or d.get('address', {}).get('value', 'Не указан')
                 
-                # Достаем основной ОКВЭД и его описание
-                okved_code = d.get('okved', '---')
+                # Чистим данные для таблицы
+                city = d.get('address', {}).get('data', {}).get('city') or d.get('address', {}).get('value', 'Не указан')
+                okved = d.get('okved', '---')
+                status = d.get('state', {}).get('status')
                 
                 formatted_leads.append({
                     "inn": d.get('inn', '-'),
                     "name": item.get('value', 'Без названия'),
                     "city": city,
-                    "okved": okved_code,
-                    "ogrn": d.get('ogrn', '-'),
-                    "score": 9 if d.get('state', {}).get('status') == 'ACTIVE' else 4
+                    "okved": okved,
+                    "status": "Действующая" if status == 'ACTIVE' else "Ликвидирована",
+                    "score": 10 if status == 'ACTIVE' else 2
                 })
 
             self.send_response(200)
