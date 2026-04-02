@@ -5,7 +5,11 @@ class handler(BaseHTTPRequestHandler):
     def do_GET(self):
         # Читаем наш дизайн из файла index.html
         try:
-            with open(os.path.join(os.path.dirname(__file__), '..', 'index.html'), 'r', encoding='utf-8') as f:
+            # Теперь файл лежит прямо в той же папке, что и этот скрипт
+        template_path = os.path.join(os.path.dirname(__file__), 'index.html')
+        try:
+            with open(template_path, 'r', encoding='utf-8') as f:
+                content = f.read()
                 content = f.read()
             self.send_response(200)
             self.send_header('Content-type', 'text/html; charset=utf-8')
